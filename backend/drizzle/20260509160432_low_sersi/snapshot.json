@@ -1,0 +1,119 @@
+{
+	"version": "8",
+	"dialect": "postgres",
+	"id": "ee1577f0-2d82-443e-8b78-54239a7a6d28",
+	"prevIds": ["00000000-0000-0000-0000-000000000000"],
+	"ddl": [
+		{
+			"isRlsEnabled": false,
+			"name": "user",
+			"entityType": "tables",
+			"schema": "public"
+		},
+		{
+			"type": "varchar",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "id",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "user"
+		},
+		{
+			"type": "varchar",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "username",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "user"
+		},
+		{
+			"type": "varchar",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "password",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "user"
+		},
+		{
+			"type": "varchar",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "email",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "user"
+		},
+		{
+			"type": "varchar(64)",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": null,
+			"generated": null,
+			"identity": null,
+			"name": "salt",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "user"
+		},
+		{
+			"type": "timestamp",
+			"typeSchema": null,
+			"notNull": true,
+			"dimensions": 0,
+			"default": "now()",
+			"generated": null,
+			"identity": null,
+			"name": "created_at",
+			"entityType": "columns",
+			"schema": "public",
+			"table": "user"
+		},
+		{
+			"columns": ["id"],
+			"nameExplicit": false,
+			"name": "user_pkey",
+			"schema": "public",
+			"table": "user",
+			"entityType": "pks"
+		},
+		{
+			"nameExplicit": false,
+			"columns": ["username"],
+			"nullsNotDistinct": false,
+			"name": "user_username_key",
+			"schema": "public",
+			"table": "user",
+			"entityType": "uniques"
+		},
+		{
+			"nameExplicit": false,
+			"columns": ["email"],
+			"nullsNotDistinct": false,
+			"name": "user_email_key",
+			"schema": "public",
+			"table": "user",
+			"entityType": "uniques"
+		}
+	],
+	"renames": []
+}

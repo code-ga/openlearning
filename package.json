@@ -1,0 +1,45 @@
+{
+  "name": "comic-sharing",
+  "type": "module",
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.13",
+    "@types/bun": "latest",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "workspaces": {
+    "packages": [
+      "./frontend",
+      "./backend"
+    ],
+    "catalog": {
+      "@sinclair/typebox": "0.34.45",
+      "elysia": "^1.4.28"
+    }
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49",
+    "elysia": "^1.4.28"
+  },
+  "overrides": {
+    "@sinclair/typebox": "^0.34.49"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "build": "bun run --filter=\"*\" --elide-lines=0 --if-present build",
+    "dev": "bun run --filter=\"*\" --elide-lines=0 --if-present dev",
+    "typecheck": "bun run --filter=\"*\" --elide-lines=0 --if-present typecheck",
+    "format": "bun run --filter=\"*\" --elide-lines=0 --if-present format",
+    "format:fix": "bun run --filter=\"*\" --elide-lines=0 --if-present format:fix",
+    "lint": "bun run --filter=\"*\" --elide-lines=0 --if-present lint",
+    "lint:fix": "bun run --filter=\"*\" --elide-lines=0 --if-present lint:fix",
+    "db:generate": "bun run --filter=\"*\" --elide-lines=0 --if-present db:generate",
+    "db:push": "bun run --filter=\"*\" --elide-lines=0 --if-present db:push",
+    "db:seed": "bun run --filter=\"*\" --elide-lines=0 --if-present db:seed",
+    "db:studio": "bun run --filter=\"*\" --elide-lines=0 --if-present db:studio",
+    "clean": "bun run --filter=\"*\" --elide-lines=0 --if-present clean && rm -rf .turbo node_modules"
+  }
+}
