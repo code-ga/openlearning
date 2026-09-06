@@ -5,9 +5,8 @@ import { databaseModule, errorHandlerModule } from "./commons/modules";
 import { authenticationModule } from "./commons/modules/auth";
 import { loggerMiddleware } from "./commons/modules/logger";
 import { apiModule } from "./modules/api";
-import { logger } from "./utils/logger";
-
 import { healthModule } from "./modules/health";
+import { logger } from "./utils/logger";
 
 const PORT = process.env.PORT || 3001;
 
@@ -51,4 +50,3 @@ process.on("unhandledRejection", (reason, promise) => {
 export type App = typeof app;
 export * as requestTypes from "./commons/types";
 export * as databaseTypes from "./database/types";
-
