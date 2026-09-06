@@ -1,4 +1,4 @@
-import Elysia, { Static } from "elysia";
+import Elysia, { type Static } from "elysia";
 import { logger } from "../../utils/logger";
 import * as errors from "../errors";
 import { HttpError } from "../errors";

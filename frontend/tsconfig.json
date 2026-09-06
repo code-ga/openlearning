@@ -19,7 +19,11 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@openlearning/config": ["../packages/config/src/index.ts"],
+      "@openlearning/domain": ["../packages/domain/src/index.ts"],
+      "@openlearning/db": ["../packages/db/src/index.ts"],
+      "@openlearning/backend": ["../backend/src/index.ts"]
     }
   },
   "include": [

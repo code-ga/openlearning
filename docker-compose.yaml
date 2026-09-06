@@ -1,31 +1,31 @@
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: comic-sharing-postgres
-    env_file:
-      - .env
+    container_name: openlearning-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-openlearning}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-openlearning}"]
+      interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - comic-sharing-network
+      - openlearning-network
 
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: comic-sharing-backend
-    image: tritranduc11/comic-sharing-backend:latest
+    container_name: openlearning-backend
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      NODE_ENV: development
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-openlearning}
       PORT: 3001
     ports:
       - "3001:3001"
@@ -33,33 +33,44 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - comic-sharing-network
+      - openlearning-network
     restart: unless-stopped
-    env_file:
-      - .env
-      - backend/.env
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: openlearning-worker
+    command: ["bun", "run", "apps/worker/src/index.ts"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-openlearning}
+      WORKER_CONCURRENCY: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - openlearning-network
+    restart: unless-stopped
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: comic-sharing-frontend
+    container_name: openlearning-frontend
     ports:
       - "3000:3000"
     depends_on:
       - backend
     networks:
-      - comic-sharing-network
+      - openlearning-network
     restart: unless-stopped
     environment:
-      BACKEND_URL: http://backend:3001
-    env_file:
-      - .env
-      - frontend/.env
+      NEXT_PUBLIC_API_URL: http://localhost:3001
 
   nginx:
     image: nginx:alpine
-    container_name: comic-sharing-nginx
+    container_name: openlearning-nginx
     ports:
       - "80:80"
     volumes:
@@ -68,7 +79,7 @@ services:
       - frontend
       - backend
     networks:
-      - comic-sharing-network
+      - openlearning-network
     restart: unless-stopped
 
 volumes:
@@ -76,5 +87,5 @@ volumes:
     driver: local
 
 networks:
-  comic-sharing-network:
+  openlearning-network:
     driver: bridge

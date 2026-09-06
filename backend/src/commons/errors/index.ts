@@ -1,6 +1,6 @@
 export class HttpError extends Error {
 	constructor(
-		public message: string,
+		public override message: string,
 		public status: number,
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		public details?: any,

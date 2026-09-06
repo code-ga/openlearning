@@ -4,14 +4,14 @@ import { Elysia } from "elysia";
 import { databaseModule, errorHandlerModule } from "./commons/modules";
 import { authenticationModule } from "./commons/modules/auth";
 import { loggerMiddleware } from "./commons/modules/logger";
-import { errorExampleModule } from "./modules/error-example";
-import { exampleModule } from "./modules/example";
-import { profileModule } from "./modules/profile";
+import { apiModule } from "./modules/api";
 import { logger } from "./utils/logger";
+
+import { healthModule } from "./modules/health";
 
 const PORT = process.env.PORT || 3001;
 
-const app = new Elysia()
+export const app = new Elysia()
 	.use(
 		cors({
 			// methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -22,15 +22,14 @@ const app = new Elysia()
 	.use(authenticationModule)
 	.use(databaseModule)
 	.use(errorHandlerModule)
+	.use(healthModule)
 	.use(
 		openapi({
 			documentation: {},
 		}),
 	)
 	.get("/", () => "Hello Elysia")
-	.use(profileModule)
-	.use(errorExampleModule)
-	.use(exampleModule)
+	.use(apiModule)
 	.listen(PORT);
 
 logger.info(
@@ -52,3 +51,4 @@ process.on("unhandledRejection", (reason, promise) => {
 export type App = typeof app;
 export * as requestTypes from "./commons/types";
 export * as databaseTypes from "./database/types";
+

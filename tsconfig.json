@@ -21,6 +21,19 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
 
+    // Path aliases
+    "baseUrl": ".",
+    "paths": {
+      "@openlearning/domain": ["packages/domain/src/index.ts"],
+      "@openlearning/domain/*": ["packages/domain/src/*"],
+      "@openlearning/db": ["packages/db/src/index.ts"],
+      "@openlearning/db/*": ["packages/db/src/*"],
+      "@openlearning/config": ["packages/config/src/index.ts"],
+      "@openlearning/config/*": ["packages/config/src/*"],
+      "@openlearning/backend": ["backend/src/index.ts"],
+      "@openlearning/backend/*": ["backend/src/*"]
+    },
+
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,

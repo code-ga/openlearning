@@ -1,5 +1,5 @@
 {
-  "name": "comic-sharing",
+  "name": "@openlearning/monorepo",
   "type": "module",
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
@@ -12,6 +12,8 @@
   },
   "workspaces": {
     "packages": [
+      "./packages/*",
+      "./apps/*",
       "./frontend",
       "./backend"
     ],
@@ -29,17 +31,18 @@
   },
   "scripts": {
     "prepare": "husky",
-    "build": "bun run --filter=\"*\" --elide-lines=0 --if-present build",
-    "dev": "bun run --filter=\"*\" --elide-lines=0 --if-present dev",
-    "typecheck": "bun run --filter=\"*\" --elide-lines=0 --if-present typecheck",
-    "format": "bun run --filter=\"*\" --elide-lines=0 --if-present format",
-    "format:fix": "bun run --filter=\"*\" --elide-lines=0 --if-present format:fix",
-    "lint": "bun run --filter=\"*\" --elide-lines=0 --if-present lint",
-    "lint:fix": "bun run --filter=\"*\" --elide-lines=0 --if-present lint:fix",
-    "db:generate": "bun run --filter=\"*\" --elide-lines=0 --if-present db:generate",
-    "db:push": "bun run --filter=\"*\" --elide-lines=0 --if-present db:push",
-    "db:seed": "bun run --filter=\"*\" --elide-lines=0 --if-present db:seed",
-    "db:studio": "bun run --filter=\"*\" --elide-lines=0 --if-present db:studio",
-    "clean": "bun run --filter=\"*\" --elide-lines=0 --if-present clean && rm -rf .turbo node_modules"
+    "build": "bun run --filter=\"*\" --if-present build",
+    "dev": "bun run --filter=\"*\" --if-present dev",
+    "typecheck": "bun run --filter=\"*\" --if-present typecheck",
+    "test": "bun test packages/config packages/domain packages/db apps/worker backend",
+    "format": "bun run --filter=\"*\" --if-present format",
+    "format:fix": "bun run --filter=\"*\" --if-present format:fix",
+    "lint": "bun run --filter=\"*\" --if-present lint",
+    "lint:fix": "bun run --filter=\"*\" --if-present lint:fix",
+    "db:generate": "bun run --filter=\"*\" --if-present db:generate",
+    "db:push": "bun run --filter=\"*\" --if-present db:push",
+    "db:seed": "bun run --filter=\"*\" --if-present db:seed",
+    "db:studio": "bun run --filter=\"*\" --if-present db:studio",
+    "clean": "bun run --filter=\"*\" --if-present clean && rm -rf .turbo node_modules"
   }
 }

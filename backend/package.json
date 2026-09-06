@@ -1,5 +1,5 @@
 {
-	"name": "@comic-sharing/backend",
+	"name": "@openlearning/backend",
 	"version": "1.0.0",
 	"scripts": {
 		"dev": "bun --watch src/index.ts",
@@ -17,6 +17,9 @@
 		"format:fix": "bunx biome format --write"
 	},
 	"dependencies": {
+		"@openlearning/config": "workspace:*",
+		"@openlearning/db": "workspace:*",
+		"@openlearning/domain": "workspace:*",
 		"@elysiajs/cors": "^1.4.2",
 		"@elysiajs/openapi": "^1.4.15",
 		"@paralleldrive/cuid2": "^3.3.0",

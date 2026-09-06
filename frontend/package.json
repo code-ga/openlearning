@@ -1,5 +1,5 @@
 {
-  "name": "@comic-sharing/frontend",
+  "name": "@openlearning/frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@comic-sharing/backend": "workspace:*",
+    "@openlearning/backend": "workspace:*",
     "@elysiajs/eden": "^1.4.9",
     "@sinclair/typebox": "catalog:",
     "better-auth": "^1.6.10",

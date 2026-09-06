@@ -1,0 +1,30 @@
+{
+  "name": "@openlearning/db",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:seed": "bun run src/seed.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@openlearning/config": "workspace:*",
+    "@openlearning/domain": "workspace:*",
+    "@paralleldrive/cuid2": "^3.3.0",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^1.0.0-beta.14",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^1.0.0-beta.14",
+    "typescript": "^5"
+  }
+}
