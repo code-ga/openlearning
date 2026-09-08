@@ -8,6 +8,7 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  WORKER_LOCK_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
 });
 
 export type Env = z.infer<typeof envSchema>;

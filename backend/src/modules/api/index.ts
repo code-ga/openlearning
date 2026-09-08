@@ -6,6 +6,7 @@ import { problemsModule } from "../problems";
 import { profileModule } from "../profile";
 import { scopesModule } from "../scopes";
 import { skillsModule } from "../skills";
+import { documentsModule } from "../documents";
 
 export const apiModule = new Elysia({ prefix: "/api" })
 	.use(healthModule)
@@ -13,5 +14,6 @@ export const apiModule = new Elysia({ prefix: "/api" })
 	.use(skillsModule)
 	.use(problemsModule)
 	.use(profileModule)
+	.use(documentsModule)
 	.use(errorExampleModule)
 	.use(exampleModule);

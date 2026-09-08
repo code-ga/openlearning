@@ -1,10 +1,11 @@
-export type LogLevel = "debug" | "info" | "warn" | "error";
+export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
 const LOG_LEVEL_WEIGHTS: Record<LogLevel, number> = {
   debug: 10,
   info: 20,
   warn: 30,
   error: 40,
+  fatal: 50,
 };
 
 export interface LogEntry {
@@ -63,6 +64,12 @@ export class Logger {
   public error(message: string, context?: Record<string, unknown>): void {
     if (this.shouldLog("error")) {
       console.error(JSON.stringify(this.formatLog("error", message, context)));
+    }
+  }
+
+  public fatal(message: string, context?: Record<string, unknown>): void {
+    if (this.shouldLog("fatal")) {
+      console.error(JSON.stringify(this.formatLog("fatal", message, context)));
     }
   }
 }

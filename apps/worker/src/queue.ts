@@ -1,14 +1,17 @@
 import { db, workerJobs } from "@openlearning/db";
-import { eq, and, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
-import { logger } from "@openlearning/config";
+import { getEnv, logger } from "@openlearning/config";
 import { jobHandlers } from "./handlers";
 
 export class WorkerQueueManager {
-  private workerId: string;
+  public workerId: string;
+  private lockTimeoutMs: number;
 
-  constructor(workerId: string = `worker_${createId()}`) {
+  constructor(workerId: string = `worker_${createId()}`, lockTimeoutMs?: number) {
     this.workerId = workerId;
+    const env = getEnv();
+    this.lockTimeoutMs = lockTimeoutMs ?? env.WORKER_LOCK_TIMEOUT_MS;
   }
 
   public async enqueueJob(
@@ -28,35 +31,59 @@ export class WorkerQueueManager {
     return id;
   }
 
-  public async pollAndProcessNextJob(): Promise<boolean> {
-    // 1. Fetch next pending job
-    const pendingJobs = await db
-      .select()
-      .from(workerJobs)
-      .where(and(eq(workerJobs.status, "pending")))
-      .limit(1);
+  public async reclaimStuckJobs(): Promise<number> {
+    const result = await db
+      .update(workerJobs)
+      .set({
+        status: "pending",
+        lockedBy: null,
+        lockedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(workerJobs.status, "processing"),
+          sql`${workerJobs.lockedAt} < now() - interval '${this.lockTimeoutMs / 1000} seconds'`
+        )
+      );
 
-    const job = pendingJobs[0];
-    if (!job) {
+    return result.rowCount ?? 0;
+  }
+
+  public async pollAndProcessNextJob(): Promise<boolean> {
+    // 1. Atomic claim: SELECT ... FOR UPDATE SKIP LOCKED then UPDATE in one statement
+    const claimedJob = await db
+      .execute(
+        sql`
+          UPDATE ${workerJobs}
+             SET status = 'processing',
+                 locked_by = ${this.workerId},
+                 locked_at = now(),
+                 attempts = ${workerJobs.attempts} + 1,
+                 updated_at = now()
+           WHERE id = (
+             SELECT id FROM ${workerJobs}
+              WHERE status = 'pending'
+                AND (locked_at IS NULL OR locked_at < now() - interval '${this.lockTimeoutMs / 1000} seconds')
+              ORDER BY created_at ASC
+              FOR UPDATE SKIP LOCKED
+              LIMIT 1
+           )
+           RETURNING *
+        `
+      );
+
+    const rows = claimedJob.rows;
+    if (!rows || rows.length === 0) {
       return false; // No pending job found
     }
 
-    // 2. Lock job
-    await db
-      .update(workerJobs)
-      .set({
-        status: "processing",
-        lockedBy: this.workerId,
-        lockedAt: new Date(),
-        attempts: job.attempts + 1,
-        updatedAt: new Date(),
-      })
-      .where(eq(workerJobs.id, job.id));
+    const job = rows[0] as Record<string, unknown>;
 
     logger.info("🔒 Worker job locked for processing", { id: job.id, jobType: job.jobType });
 
-    // 3. Execute handler
-    const handler = jobHandlers[job.jobType];
+    // 2. Execute handler
+    const handler = jobHandlers[job.jobType as string];
     if (!handler) {
       const errorMsg = `No registered handler for job type '${job.jobType}'`;
       logger.error("❌ Worker job failed", { id: job.id, error: errorMsg });
@@ -67,7 +94,7 @@ export class WorkerQueueManager {
           error: errorMsg,
           updatedAt: new Date(),
         })
-        .where(eq(workerJobs.id, job.id));
+        .where(eq(workerJobs.id, job.id as string));
       return true;
     }
 
@@ -81,13 +108,14 @@ export class WorkerQueueManager {
           completedAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(eq(workerJobs.id, job.id));
+        .where(eq(workerJobs.id, job.id as string));
 
       logger.info("✅ Worker job completed", { id: job.id, jobType: job.jobType });
       return true;
     } catch (err) {
       const errorStr = String(err);
-      const isFinalAttempt = job.attempts + 1 >= job.maxAttempts;
+      const currentAttempts = (job.attempts as number) ?? 0;
+      const isFinalAttempt = currentAttempts + 1 >= (job.maxAttempts as number);
       const nextStatus = isFinalAttempt ? "failed" : "pending";
 
       await db
@@ -97,7 +125,7 @@ export class WorkerQueueManager {
           error: errorStr,
           updatedAt: new Date(),
         })
-        .where(eq(workerJobs.id, job.id));
+        .where(eq(workerJobs.id, job.id as string));
 
       logger.error("⚠️ Worker job processing error", { id: job.id, error: errorStr, nextStatus });
       return true;

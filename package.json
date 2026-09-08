@@ -24,7 +24,9 @@
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.49",
-    "elysia": "^1.4.28"
+    "@types/pdf-parse": "^1.1.5",
+    "elysia": "^1.4.28",
+    "pdf-parse": "^2.4.5"
   },
   "overrides": {
     "@sinclair/typebox": "^0.34.49"

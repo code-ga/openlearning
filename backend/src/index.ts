@@ -6,7 +6,7 @@ import { authenticationModule } from "./commons/modules/auth";
 import { loggerMiddleware } from "./commons/modules/logger";
 import { apiModule } from "./modules/api";
 import { healthModule } from "./modules/health";
-import { logger } from "./utils/logger";
+import { logger } from "@openlearning/config";
 
 const PORT = process.env.PORT || 3001;
 

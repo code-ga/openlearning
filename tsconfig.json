@@ -31,7 +31,9 @@
       "@openlearning/config": ["packages/config/src/index.ts"],
       "@openlearning/config/*": ["packages/config/src/*"],
       "@openlearning/backend": ["backend/src/index.ts"],
-      "@openlearning/backend/*": ["backend/src/*"]
+      "@openlearning/backend/*": ["backend/src/*"],
+      "@openlearning/worker": ["apps/worker/src/index.ts"],
+      "@openlearning/worker/*": ["apps/worker/src/*"]
     },
 
     // Some stricter flags (disabled by default)

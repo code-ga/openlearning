@@ -45,31 +45,31 @@
     - [x] Task 3.3.1: Write DB integration tests in `packages/db/src/index.test.ts`.
     - [x] *Verification*: `bun test packages/db` passes.
 
-- [/] **Epic 4: Backend API Framework (`apps/api`)**
-  - [/] **Step 4.1: Framework, Middleware & Swagger Setup**
-    - [ ] Task 4.1.1: Wire global error handler middleware, CORS, and Swagger UI (`/swagger`).
-    - [ ] Task 4.1.2: Implement system health check endpoint (`GET /health`).
-    - [ ] *Verification*: `GET /health` returns 200 OK and `/swagger` loads.
-  - [ ] **Step 4.2: Foundation Domain REST Endpoints**
-    - [ ] Task 4.2.1: Implement `/api/v1/scopes` endpoints.
-    - [ ] Task 4.2.2: Implement `/api/v1/skills` endpoints.
-    - [ ] Task 4.2.3: Implement `/api/v1/problems` endpoints.
-    - [ ] Task 4.2.4: Standardize response schemas (200, 400, 404, 500).
-    - [ ] *Verification*: API endpoints return standard response shapes.
-  - [ ] **Step 4.3: API Integration Tests**
-    - [ ] Task 4.3.1: Write integration tests using Elysia `app.handle` and `bun test`.
-    - [ ] *Verification*: `bun test apps/api` passes.
+- [x] **Epic 4: Backend API Framework (`backend/`)**
+  - [x] **Step 4.1: Framework, Middleware & Swagger Setup**
+    - [x] Task 4.1.1: Wire global error handler middleware, CORS, and Swagger UI (`/swagger`).
+    - [x] Task 4.1.2: Implement system health check endpoint (`GET /health`).
+    - [x] *Verification*: `GET /health` returns 200 OK and `/swagger` loads.
+  - [x] **Step 4.2: Foundation Domain REST Endpoints**
+    - [x] Task 4.2.1: Implement `/api/v1/scopes` endpoints.
+    - [x] Task 4.2.2: Implement `/api/v1/skills` endpoints.
+    - [x] Task 4.2.3: Implement `/api/v1/problems` endpoints.
+    - [x] Task 4.2.4: Standardize response schemas (200, 400, 404, 500).
+    - [x] *Verification*: API endpoints return standard response shapes.
+  - [x] **Step 4.3: API Integration Tests**
+    - [x] Task 4.3.1: Write integration tests using Elysia `app.handle` and `bun test`.
+    - [x] *Verification*: `bun test backend` passes (11 tests).
 
-- [ ] **Epic 5: Background Worker Engine (`apps/worker`)**
-  - [ ] **Step 5.1: Worker Execution Architecture & Queue Processor**
-    - [ ] Task 5.1.1: Implement Postgres-backed `WorkerQueueManager` handling job polling, locks, timeouts, and state machine transitions.
-    - [ ] Task 5.1.2: Define standard `WorkerJob` interface and registry.
-    - [ ] *Verification*: Unit tests verifying worker locking and queue transitions.
-  - [ ] **Step 5.2: Phase 0 Demo Worker Job & Worker Entrypoint**
-    - [ ] Task 5.2.1: Implement `ping_job` and document processing stub handler.
-    - [ ] Task 5.2.2: Wire `apps/worker/src/index.ts` daemon process.
-    - [ ] Task 5.2.3: Write worker integration tests for job enqueueing and processing.
-    - [ ] *Verification*: `bun test apps/worker` passes.
+- [x] **Epic 5: Background Worker Engine (`apps/worker`)**
+  - [x] **Step 5.1: Worker Execution Architecture & Queue Processor**
+    - [x] Task 5.1.1: Implement Postgres-backed `WorkerQueueManager` handling job polling, locks, timeouts, and state machine transitions.
+    - [x] Task 5.1.2: Define standard `WorkerJob` interface and registry.
+    - [x] *Verification*: Unit tests verifying worker locking and queue transitions.
+  - [x] **Step 5.2: Phase 0 Demo Worker Job & Worker Entrypoint**
+    - [x] Task 5.2.1: Implement `ping_job` and document processing stub handler.
+    - [x] Task 5.2.2: Wire `apps/worker/src/index.ts` daemon process.
+    - [x] Task 5.2.3: Write worker integration tests for job enqueueing and processing.
+    - [x] *Verification*: `bun test apps/worker` passes (7 tests + integration tests).
 
 - [x] **Epic 6: Full Stack Orchestration, Verification & DX Polish**
   - [x] **Step 6.1: Monorepo Orchestration & Docker Compose**
@@ -81,3 +81,75 @@
     - [x] Task 6.2.2: Execute `bun test` across all packages.
     - [x] Task 6.2.3: Update `PROJECT_DESCRIPTION.md` and `changes.md` with task details and summaries.
     - [x] *Verification*: Complete test pass and updated documentation.
+
+---
+
+# MVP Phase 1 — PDF → Question: Plan & Task Tracker
+
+> **Phase Goal**: Deliver PDF ingestion pipeline: `PDF → pages → blocks → questions → answers → provenance` (v0.2 §77). Deterministic first; no sophisticated AI.
+
+---
+
+## Task Progress Summary
+
+- [x] **Epic 1: Schema & Migration**
+  - [x] **Step 1.1: Ingestion Schema Extension (`packages/db/src/schema/ingestion.ts`)**
+    - [x] Task 1.1.1: Add `sourceBlocks` table with columns: `id`, `documentId`, `pageId`, `pageNumber`, `blockIndex`, `content`, `kind`, `bbox`.
+    - [x] Task 1.1.2: Add `extractedQuestions` staging table with columns: `id`, `sourceDocumentId`, `pageStart`, `pageEnd`, `startBlockId`, `endBlockId`, `number`, `statement`, `options`, `answerKey`, `confidence`, `status`.
+    - [x] Task 1.1.3: Add indexes on `(documentId)`, `(pageId)`, `(pageId, blockIndex)` for `sourceBlocks`; `(sourceDocumentId)`, `(status)` for `extractedQuestions`.
+    - [x] *Verification*: `bun --cwd packages/db db:generate` produces migration `20260908154738_tough_cerise`.
+
+- [x] **Epic 2: Worker Jobs (`apps/worker/src/handlers.ts`)**
+  - [x] **Step 2.1: PDF Extraction Job**
+    - [x] Task 2.1.1: Add `pdf-parse` dependency to `apps/worker`.
+    - [x] Task 2.1.2: Implement `extract_document` handler: read PDF from `storagePath`, parse with `pdf-parse`, populate `sourcePages`, `sourceBlocks`, `provenance`.
+    - [x] Task 2.1.3: Add TypeScript declarations for `pdf-parse` (`global.d.ts`, `packages/config/src/pdf-parse.d.ts`).
+    - [x] *Verification*: Typecheck passes; handler compiles.
+  - [x] **Step 2.2: Normalization Job**
+    - [x] Task 2.2.1: Implement `normalize_document` handler: whitespace/Unicode cleanup of page and block content.
+    - [x] *Verification*: Typecheck passes.
+  - [x] **Step 2.3: Question Segmentation Job**
+    - [x] Task 2.3.1: Implement `segment_questions` handler: deterministic heuristics (numbering patterns, option detection) over `sourceBlocks` → `extractedQuestions`.
+    - [x] Task 2.3.2: Export helper functions: `normalizeText`, `detectBlockKind`, `splitIntoBlocks`.
+    - [x] *Verification*: Typecheck passes; unit tests for regex patterns pass.
+  - [x] **Step 2.4: Answer Extraction Job**
+    - [x] Task 2.4.1: Implement `extract_answers` handler: pull answer key from known answer blocks / option mapping → `extractedQuestions.answerKey`.
+    - [x] Task 2.4.2: Promotion logic: `status='stable'` if answer found, else `status='review'`.
+    - [x] *Verification*: Typecheck passes.
+
+- [x] **Epic 3: Document Ingestion API (`backend/src/modules/documents/`)**
+  - [x] **Step 3.1: REST Endpoints**
+    - [x] Task 3.1.1: `POST /v1/documents` — persist `sourceDocuments`, enqueue `extract_document`, return `{ id, jobId }`.
+    - [x] Task 3.1.2: `POST /v1/documents/:id/process` — enqueue/requeue extraction (idempotent).
+    - [x] Task 3.1.3: `GET /v1/documents/:id` — metadata + status.
+    - [x] Task 3.1.4: `GET /v1/documents/:id/pages` — list pages.
+    - [x] Task 3.1.5: `GET /v1/documents/:id/blocks` — list blocks (optional `?page=` filter).
+    - [x] Task 3.1.6: `GET /v1/documents/:id/questions` — list `extractedQuestions` (filter `?status=`).
+    - [x] Task 3.1.7: `GET /v1/documents/:id/jobs` — list worker jobs for document.
+    - [x] Task 3.1.8: Register `documentsModule` in `backend/src/modules/api/index.ts`.
+    - [x] *Verification*: Typecheck passes; endpoints follow standard response schemas.
+
+- [x] **Epic 4: Seed Data & Fixtures (`packages/db/src/seed.ts`)**
+  - [x] **Step 4.1: Fixture Document Data**
+    - [x] Task 4.1.1: Add fixture `sourceDocument` (`doc_fixture_math_01`), 2 pages, 11 blocks.
+    - [x] Task 4.1.2: Add 2 `extractedQuestions` with options, answer keys, `status='stable'`.
+    - [x] Task 4.1.3: Add `provenance` entries for pages and blocks.
+    - [x] *Verification*: `bun --cwd packages/db run src/seed.ts` completes without errors.
+
+- [x] **Epic 5: Unit Tests & Deterministic Validation**
+  - [x] **Step 5.1: Segmentation Unit Tests (`apps/worker/src/handlers.test.ts`)**
+    - [x] Task 5.1.1: Test `normalizeText`, `detectBlockKind`, `splitIntoBlocks` helpers.
+    - [x] Task 5.1.2: Test question numbering regex patterns (`Question 1.`, `1)`, etc.).
+    - [x] Task 5.1.3: Test option detection regex patterns (`A.`, `B)`, etc.).
+    - [x] Task 5.1.4: Test answer key detection regex patterns.
+    - [x] *Verification*: `bun test apps/worker` passes.
+
+- [x] **Epic 6: Verification & Documentation**
+  - [x] **Step 6.1: Typecheck & Test Suite**
+    - [x] Task 6.1.1: `bun run typecheck` → 0 errors across all workspaces.
+    - [x] Task 6.1.2: `bun test` → 51 tests pass across 8 files, 0 failures.
+  - [x] **Step 6.2: Documentation Updates**
+    - [x] Task 6.2.1: Update `PROJECT_DESCRIPTION.md` with Phase 1 architecture, flows, and schema.
+    - [x] Task 6.2.2: Update `changes.md` with Phase 1 summary.
+    - [x] Task 6.2.3: Update `plan.md` with Phase 1 task tracker.
+  - [x] *Verification*: All documentation reflects current implementation.

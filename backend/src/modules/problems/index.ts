@@ -2,7 +2,8 @@ import { db, problems, solutionApproaches } from "@openlearning/db";
 import { createId } from "@paralleldrive/cuid2";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { baseResponseSchema } from "../../commons/types";
+import { notFound } from "../../commons/modules/error-handler";
+import { baseResponseSchema, errorResponseSchema } from "../../commons/types";
 
 const problemSchema = t.Object({
 	id: t.String(),
@@ -36,7 +37,7 @@ export const problemsModule = new Elysia({ prefix: "/v1/problems" })
 					timestamp: Date.now(),
 					status: 200,
 				};
-			} catch (err) {
+			} catch (_err) {
 				return {
 					success: true,
 					message: "Problems retrieved (fallback/offline mode)",
@@ -49,6 +50,8 @@ export const problemsModule = new Elysia({ prefix: "/v1/problems" })
 		{
 			response: {
 				200: baseResponseSchema(t.Array(problemSchema)),
+				400: errorResponseSchema,
+				500: errorResponseSchema,
 			},
 			detail: {
 				tags: ["Problems"],
@@ -59,37 +62,43 @@ export const problemsModule = new Elysia({ prefix: "/v1/problems" })
 	.get(
 		"/:id",
 		async ({ params: { id }, set }) => {
-			const problemList = await db
-				.select()
-				.from(problems)
-				.where(eq(problems.id, id))
-				.limit(1);
-			const problem = problemList[0];
-			if (!problem) {
-				set.status = 404;
+			try {
+				const problemList = await db
+					.select()
+					.from(problems)
+					.where(eq(problems.id, id))
+					.limit(1);
+				const problem = problemList[0];
+				if (!problem) {
+					set.status = 404;
+					return notFound("Problem");
+				}
+				const approaches = await db
+					.select()
+					.from(solutionApproaches)
+					.where(eq(solutionApproaches.problemId, id));
+
+				set.status = 200;
+				return {
+					success: true,
+					message: "Problem retrieved successfully",
+					data: {
+						...problem,
+						approaches,
+					},
+					timestamp: Date.now(),
+					status: 200,
+				};
+			} catch (err) {
+				set.status = 500;
 				return {
 					success: false,
-					message: `Problem with id '${id}' not found`,
-					data: null,
+					message: "Failed to retrieve problem",
+					status: 500,
+					details: err instanceof Error ? err.message : undefined,
 					timestamp: Date.now(),
-					status: 404,
 				};
 			}
-			const approaches = await db
-				.select()
-				.from(solutionApproaches)
-				.where(eq(solutionApproaches.problemId, id));
-
-			return {
-				success: true,
-				message: "Problem retrieved successfully",
-				data: {
-					...problem,
-					approaches,
-				},
-				timestamp: Date.now(),
-				status: 200,
-			};
 		},
 		{
 			params: t.Object({
@@ -104,7 +113,9 @@ export const problemsModule = new Elysia({ prefix: "/v1/problems" })
 						}),
 					]),
 				),
-				404: baseResponseSchema(t.Null()),
+				404: errorResponseSchema,
+				400: errorResponseSchema,
+				500: errorResponseSchema,
 			},
 			detail: {
 				tags: ["Problems"],
@@ -115,37 +126,48 @@ export const problemsModule = new Elysia({ prefix: "/v1/problems" })
 	.post(
 		"/",
 		async ({ body, set }) => {
-			const id = createId();
-			const newProblem = {
-				id,
-				statement: body.statement,
-				assumptions: body.assumptions || [],
-				goals: body.goals || [],
-				skillIds: body.skillIds || [],
-				scopeIds: body.scopeIds || [],
-				solutionApproachIds: [],
-				difficulty: body.difficulty || {
-					estimatedLevel: 1,
-					confidence: 0.5,
-					calibrated: false,
-				},
-				sourceIds: body.sourceIds || [],
-				status: body.status || "draft",
-			};
+			try {
+				const id = createId();
+				const newProblem = {
+					id,
+					statement: body.statement,
+					assumptions: body.assumptions || [],
+					goals: body.goals || [],
+					skillIds: body.skillIds || [],
+					scopeIds: body.scopeIds || [],
+					solutionApproachIds: [],
+					difficulty: body.difficulty || {
+						estimatedLevel: 1,
+						confidence: 0.5,
+						calibrated: false,
+					},
+					sourceIds: body.sourceIds || [],
+					status: body.status || "draft",
+				};
 
-			await db.insert(problems).values(newProblem);
-			const created = (
-				await db.select().from(problems).where(eq(problems.id, id)).limit(1)
-			)[0];
+				await db.insert(problems).values(newProblem);
+				const created = (
+					await db.select().from(problems).where(eq(problems.id, id)).limit(1)
+				)[0];
 
-			set.status = 201;
-			return {
-				success: true,
-				message: "Problem created successfully",
-				data: created,
-				timestamp: Date.now(),
-				status: 201,
-			};
+				set.status = 201;
+				return {
+					success: true,
+					message: "Problem created successfully",
+					data: created,
+					timestamp: Date.now(),
+					status: 201,
+				};
+			} catch (err) {
+				set.status = 500;
+				return {
+					success: false,
+					message: "Failed to create problem",
+					status: 500,
+					details: err instanceof Error ? err.message : undefined,
+					timestamp: Date.now(),
+				};
+			}
 		},
 		{
 			body: t.Object({
@@ -166,6 +188,8 @@ export const problemsModule = new Elysia({ prefix: "/v1/problems" })
 			}),
 			response: {
 				201: baseResponseSchema(problemSchema),
+				400: errorResponseSchema,
+				500: errorResponseSchema,
 			},
 			detail: {
 				tags: ["Problems"],

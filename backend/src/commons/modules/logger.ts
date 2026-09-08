@@ -1,5 +1,5 @@
 import Elysia from "elysia";
-import { logger } from "../../utils/logger";
+import { logger } from "@openlearning/config";
 
 export const loggerMiddleware = new Elysia({ name: "logger" })
 	.onRequest(({ request }) => {
@@ -17,6 +17,7 @@ export const loggerMiddleware = new Elysia({ name: "logger" })
 		});
 	})
 	.onError(({ request, error, set }) => {
+		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 		const err = error as Record<string, any>;
 		logger.error(`Error processing request: ${request.method} ${request.url}`, {
 			method: request.method,

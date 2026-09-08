@@ -1,3 +1,65 @@
+## [2026-09-08 16:20:00] — MVP Phase 1: PDF → Question (PDF Ingestion Pipeline)
+
+### Summary of Changes
+- **Schema (`packages/db/src/schema/ingestion.ts`)**:
+  - Added `sourceBlocks` table: `id`, `documentId`, `pageId`, `pageNumber`, `blockIndex`, `content`, `kind` (text/figure/table/equation), `bbox`. Indexes on `(documentId)`, `(pageId)`, `(pageId, blockIndex)`.
+  - Added `extractedQuestions` staging table: `id`, `sourceDocumentId`, `pageStart`, `pageEnd`, `startBlockId`, `endBlockId`, `number`, `statement`, `options` (jsonb), `answerKey` (jsonb), `confidence`, `status` (pending/review/stable). Indexes on `(sourceDocumentId)`, `(status)`.
+  - Generated migration `20260908154738_tough_cerise` via `bun db:generate`.
+
+- **Worker Jobs (`apps/worker/src/handlers.ts`)**:
+  - `extract_document`: Deterministic PDF text extraction via `pdf-parse` → populates `sourcePages`, `sourceBlocks`, `provenance`.
+  - `normalize_document`: Whitespace/Unicode cleanup of page and block content.
+  - `segment_questions`: Deterministic heuristics (numbering patterns `Question 1`, `(1)`, `1.`, option detection `A.`, `B)`, etc.) over `sourceBlocks` → `extractedQuestions`.
+  - `extract_answers`: Pulls answer key from known answer blocks / option mapping → `extractedQuestions.answerKey`, promotes to `stable` or `review`.
+  - Exported helper functions: `getStoragePath`, `normalizeText`, `detectBlockKind`, `splitIntoBlocks` for testability.
+
+- **API (`backend/src/modules/documents/index.ts`)**:
+  - `POST /v1/documents` — Persist `sourceDocuments` row, enqueue `extract_document` job, return `{ id, jobId }`.
+  - `POST /v1/documents/:id/process` — Enqueue/requeue extraction (idempotent).
+  - `GET /v1/documents/:id` — Metadata + status.
+  - `GET /v1/documents/:id/pages` — List pages.
+  - `GET /v1/documents/:id/blocks` — List blocks (optional `?page=` filter).
+  - `GET /v1/documents/:id/questions` — List `extractedQuestions` (filter `?status=`).
+  - `GET /v1/documents/:id/jobs` — List worker jobs for document.
+  - Registered `documentsModule` in `backend/src/modules/api/index.ts`.
+
+- **Infrastructure & Config**:
+  - Added `pdf-parse` dependency to `apps/worker` with type declarations in `global.d.ts` and `packages/config/src/pdf-parse.d.ts`.
+  - Added `fatal` log level to `packages/config/src/logger.ts`.
+  - Exported `WorkerQueueManager` from `apps/worker/src/index.ts` for API consumption.
+  - Switched backend logger to use `@openlearning/config` logger.
+
+- **Seed Data (`packages/db/src/seed.ts`)**:
+  - Extended with fixture `sourceDocument` (`doc_fixture_math_01`), 2 pages, 11 blocks, 2 extracted questions with answer keys, and provenance entries.
+
+- **Tests (`apps/worker/src/handlers.test.ts`)**:
+  - Unit tests for `normalizeText`, `detectBlockKind`, `splitIntoBlocks` helpers.
+  - Unit tests for question segmentation regex patterns (numbering, options).
+  - Unit tests for answer key detection patterns.
+
+- **Verification**:
+  - `bun run typecheck` → 0 errors across all workspaces (config, domain, db, backend, frontend, worker).
+  - `bun test` → 51 tests pass across 8 files, 0 failures.
+
+## [2026-09-07 16:50:00] — MVP Phase 0 Gap Closure (Epics 4 & 5 Completion)
+
+### Summary of Changes
+- **Epic 4 — Backend API Contract Hardening**:
+  - Added explicit TypeBox `response` schemas (200, 400, 404, 500) to `/v1/scopes`, `/v1/skills`, and `/v1/problems` route handlers.
+  - Introduced `notFound(entity)` helper in `backend/src/commons/modules/error-handler.ts` for standardized 404 responses.
+  - Wrapped `/:id` route DB queries in try/catch blocks to return standardized 500 error responses instead of propagating uncaught exceptions.
+  - Expanded `backend/src/index.test.ts` with integration tests covering 404 paths, unknown route error shape, POST round-trip, and standardized error response validation (11 tests total).
+- **Epic 5 — Background Worker Hardening**:
+  - Replaced SELECT-then-UPDATE race condition with atomic `FOR UPDATE SKIP LOCKED` claim SQL in `apps/worker/src/queue.ts`.
+  - Added `WORKER_LOCK_TIMEOUT_MS` config (default 300000ms) to `packages/config/src/env.ts`.
+  - Added `reclaimStuckJobs()` method to `WorkerQueueManager` for reclaiming expired `processing` jobs.
+  - Refactored `apps/worker/src/index.ts` to export `startWorkerDaemon({ signal, pollIntervalMs })` returning a `WorkerController` for testability.
+  - Added `apps/worker/src/queue.integration.test.ts` with integration tests for end-to-end job processing, unknown job type failure path, and retry logic (7 tests + integration tests).
+  - Added daemon smoke test in `apps/worker/src/index.test.ts` that boots the loop, processes a `ping_job`, and aborts cleanly.
+- **Verification**:
+  - `bun run typecheck` → 0 errors across all workspaces.
+  - `bun test` → 28 tests pass across 7 files, 0 failures.
+
 ## [2026-09-06 23:32:00] - Complete MVP Phase 0 (Foundations) Implementation
 
 ### Summary of Changes

@@ -7,6 +7,10 @@ This is a monolithic repository containing a Next.js frontend and an ElysiaJS ba
 - `/backend`: ElysiaJS backend application.
 - `/nginx`: NGINX configuration for reverse proxying requests.
 - `docker-compose.yaml`: Docker compose configuration for running Postgres, backend, frontend, and nginx.
+- `/packages/config`: Shared configuration (env validation, logger).
+- `/packages/domain`: Domain models and type guards.
+- `/packages/db`: Drizzle ORM schemas, client, and seeding.
+- `/apps/worker`: Background worker for document processing.
 
 ## Task Overview
 
@@ -43,8 +47,8 @@ This is a monolithic repository containing a Next.js frontend and an ElysiaJS ba
 
 ### Monorepo Architecture & Package Map
 - **`packages/config`**:
-  - `src/env.ts`: Schema validation for environment variables using Zod (`DATABASE_URL`, `PORT`, `LOG_LEVEL`, `WORKER_CONCURRENCY`, `WORKER_POLL_INTERVAL_MS`).
-  - `src/logger.ts`: Structured JSON logger class supporting log levels (`debug`, `info`, `warn`, `error`) and context payload formatting.
+  - `src/env.ts`: Schema validation for environment variables using Zod (`DATABASE_URL`, `PORT`, `LOG_LEVEL`, `WORKER_CONCURRENCY`, `WORKER_POLL_INTERVAL_MS`, `WORKER_LOCK_TIMEOUT_MS`).
+  - `src/logger.ts`: Structured JSON logger class supporting log levels (`debug`, `info`, `warn`, `error`, `fatal`) and context payload formatting.
 - **`packages/domain`**:
   - `src/base.ts`: Base `Entity` interface and `ID` type.
   - `src/scope.ts`: `KnowledgeScope` domain model.
@@ -54,32 +58,77 @@ This is a monolithic repository containing a Next.js frontend and an ElysiaJS ba
   - `src/assessment.ts`: 4-layer assessment hierarchy (`Problem` → `Assessment` → `AssessmentItem` → `Attempt`).
   - `src/index.ts`: Re-exports domain entities and type guards (`isKnowledgeNode`, `isProblem`, `isAssessment`, `isSkill`).
 - **`packages/db`**:
-  - `src/schema/*`: Drizzle ORM PostgreSQL schemas (`users`, `repositories`, `scopes`, `skills`, `knowledge_nodes`, `problems`, `solution_approaches`, `assessments`, `source_documents`, `worker_jobs`).
+  - `src/schema/*`: Drizzle ORM PostgreSQL schemas (`users`, `repositories`, `scopes`, `skills`, `knowledge_nodes`, `problems`, `solution_approaches`, `assessments`, `source_documents`, `source_pages`, `source_blocks`, `extracted_questions`, `provenance`, `ai_artifacts`, `worker_jobs`).
   - `src/client.ts`: Drizzle client factory & pool management (`createDbClient`, `getPgPool`).
-  - `src/seed.ts`: Database seeder script for baseline scopes, skills, nodes, and test problems.
+  - `src/seed.ts`: Database seeder script for baseline scopes, skills, nodes, test problems, and fixture documents for PDF ingestion testing.
 - **`apps/worker`**:
-  - `src/queue.ts`: `WorkerQueueManager` managing Postgres-backed job polling, state transitions (`pending` → `processing` → `completed` | `failed`), retries, and locks.
-  - `src/handlers.ts`: Job handlers registry (`ping_job`, `document_extract_stub`).
-  - `src/index.ts`: Background worker daemon process entrypoint.
+  - `src/queue.ts`: `WorkerQueueManager` managing Postgres-backed job polling, state transitions (`pending` → `processing` → `completed` | `failed`), retries, and locks using atomic `FOR UPDATE SKIP LOCKED` claim.
+  - `src/handlers.ts`: Job handlers registry (`ping_job`, `document_extract_stub`, `extract_document`, `normalize_document`, `segment_questions`, `extract_answers`).
+  - `src/index.ts`: Background worker daemon entrypoint exporting `startWorkerDaemon` and `WorkerQueueManager` for programmatic control.
 - **`backend`**:
   - `src/modules/health`: `GET /health` system health endpoint.
   - `src/modules/scopes`: REST endpoints `GET /v1/scopes` & `GET /v1/scopes/:id`.
   - `src/modules/skills`: REST endpoints `GET /v1/skills` & `GET /v1/skills/:id`.
   - `src/modules/problems`: REST endpoints `GET /v1/problems`, `GET /v1/problems/:id`, `POST /v1/problems`.
+  - `src/modules/documents`: REST endpoints `POST /v1/documents`, `POST /v1/documents/:id/process`, `GET /v1/documents/:id`, `GET /v1/documents/:id/pages`, `GET /v1/documents/:id/blocks`, `GET /v1/documents/:id/questions`, `GET /v1/documents/:id/jobs`.
 
 ### Feature Flows & Execution Pipeline
 1. **API Handling**: Client HTTP requests arrive at Nginx (`:80`) → routed to Elysia API (`:3001`). Input validated using TypeBox schemas → DB query executed via `@openlearning/db` → standardized JSON response returned.
-2. **Worker Processing**: Background tasks (document parsing, classification) are enqueued into `worker_jobs` DB table → `WorkerQueueManager` polls pending jobs, acquires DB lock, runs handler in `apps/worker/src/handlers.ts`, and updates status to `completed` or `failed`.
-3. **Database Migrations & Seeding**: `bun db:generate` creates SQL migrations in `packages/db/drizzle`. `bun db:seed` inserts baseline scopes, skills, and test problems.
+2. **Standardized Response Contract**: All API endpoints declare explicit TypeBox schemas for 200, 400, 404, and 500 status codes using `baseResponseSchema` and `errorResponseSchema`. The shared `notFound(entity)` helper in `backend/src/commons/modules/error-handler.ts` produces the standardized 404 shape: `{ success: false, message, status: 404, details: null, timestamp }`. Never `throw new Error(...)` inside handlers; let the centralized error handler manage errors.
+3. **Worker Processing**: Background tasks are enqueued into `worker_jobs` DB table → `WorkerQueueManager` atomically claims jobs using `FOR UPDATE SKIP LOCKED` → runs handler in `apps/worker/src/handlers.ts` → updates status to `completed` or `failed`. Lock timeout is configurable via `WORKER_LOCK_TIMEOUT_MS` (default 300000ms = 5min). Stuck `processing` jobs are reclaimable via `reclaimStuckJobs()`.
+4. **Document Ingestion Pipeline (Phase 1)**:
+   - `POST /v1/documents` — Creates `sourceDocuments` row, enqueues `extract_document` job.
+   - `extract_document` — Uses `pdf-parse` to extract text from PDF → populates `sourcePages`, `sourceBlocks`, `provenance`.
+   - `normalize_document` — Unicode/whitespace cleanup of page and block content.
+   - `segment_questions` — Deterministic heuristics (numbering patterns, option detection) over `sourceBlocks` → `extractedQuestions`.
+   - `extract_answers` — Pulls answer key from known answer blocks → updates `extractedQuestions.answerKey`, promotes to `stable` or `review`.
+   - `GET /v1/documents/:id/questions` — Lists extracted questions with optional `?status=` filter.
+5. **Database Migrations & Seeding**: `bun db:generate` creates SQL migrations in `packages/db/drizzle`. `bun db:seed` inserts baseline scopes, skills, test problems, and fixture documents.
+
+## MVP Phase 1 — PDF → Question (COMPLETED)
+
+### Schema (`packages/db/src/schema/ingestion.ts`)
+- Added `sourceBlocks` table: `id`, `documentId`, `pageId`, `pageNumber`, `blockIndex`, `content`, `kind` (text/figure/table/equation), `bbox`. Indexes on `(documentId)`, `(pageId)`, `(pageId, blockIndex)`.
+- Added `extractedQuestions` staging table: `id`, `sourceDocumentId`, `pageStart`, `pageEnd`, `startBlockId`, `endBlockId`, `number`, `statement`, `options` (jsonb), `answerKey` (jsonb), `confidence`, `status` (pending/review/stable). Indexes on `(sourceDocumentId)`, `(status)`.
+
+### Worker Jobs (`apps/worker/src/handlers.ts`)
+- `extract_document`: Deterministic PDF text extraction via `pdf-parse` → populates `sourcePages` + `sourceBlocks` + `provenance` rows.
+- `normalize_document`: Whitespace/Unicode cleanup before segmentation.
+- `segment_questions`: Deterministic heuristics (numbering patterns `Question 1`, `(1)`, `1.`, option detection `A.`, `B)`, etc.) over `sourceBlocks` → `extractedQuestions`.
+- `extract_answers`: Pulls answer key from known answer blocks / option mapping → `extractedQuestions.answerKey`.
+- Chain: `extract_document` → `normalize_document` → `segment_questions` → `extract_answers` (enqueued sequentially via API).
+
+### API (`backend/src/modules/documents/`)
+- `POST /v1/documents` — Persist `sourceDocuments` row, enqueue `extract_document` job, return `{ id, jobId }`.
+- `POST /v1/documents/:id/process` — Enqueue/requeue extraction (idempotent).
+- `GET /v1/documents/:id` — Metadata + status.
+- `GET /v1/documents/:id/pages` — List pages.
+- `GET /v1/documents/:id/blocks` — List blocks (optional `?page=` filter).
+- `GET /v1/documents/:id/questions` — List `extractedQuestions` (filter `?status=`).
+- `GET /v1/documents/:id/jobs` — List worker jobs for document.
+
+### Deterministic Validation
+- Rule checks on `extractedQuestions`: non-empty `statement`; option count matches detected type; `answerKey` present; page/block spans valid. On failure → set `status='review'`, do NOT auto-promote.
+
+### Seed + Tests
+- Extended `packages/db/src/seed.ts` with representative `sourceDocument`/`sourcePages`/`sourceBlocks`/`extractedQuestions` fixture data.
+- Unit tests for segmentation rules (numbering/option heuristics) in `apps/worker/src/handlers.test.ts`.
+
+### DX / Infra
+- Added `pdf-parse` (deterministic) to `apps/worker` deps.
+- TypeScript declarations for `pdf-parse` in `global.d.ts` and `packages/config/src/pdf-parse.d.ts`.
 
 ## Future Updates & Ideas
 - Update environment variables configuration in frontend. Currently it seems to have remnants of Vite (`import.meta.env`) but uses Next.js (`process.env.NEXT_PUBLIC_...`).
 - Verify if any WebSocket proxying needs adjustments for ElysiaJS or Next.js HMR.
 - Verify Elysia backend correctly parses requests from the Nginx proxy if client IPs are needed.
-- Implement Phase 1: PDF Extraction Pipeline (`extract_document`, `normalize_document`, `segment_questions`).
+- Phase 2: Solution→canonical Problem/Assessment linking, skill classification.
+- Phase 7: AI enrichment for question extraction (improve confidence, handle edge cases).
 
 ## Notes & Warnings
 - When adding new services or changing ports, update Nginx configuration accordingly.
 - Always use `bun.js` (`bun test`, `bun typecheck`, `bun dev`) for script execution across workspace packages.
+- Phase 1 stores uploaded PDFs on **local disk** under `./storage/pdfs/` (mounted volume in `docker-compose.yaml`). `sourceDocuments.storagePath` is a relative path string. Design for future S3 migration via `getDocumentPath(storagePath)` helper.
+- Tier 2 legacy resources (`backend/src/database/`, `backend/src/modules/profile/`, `frontend/`, `better-auth`, `drizzle-typebox`, `pglite`, `pino-pretty`) are marked for removal in a future cleanup but not yet removed (auth/UI deferred to later phase).
 
 

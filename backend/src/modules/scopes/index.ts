@@ -1,7 +1,8 @@
 import { db, scopes } from "@openlearning/db";
 import { eq } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import { baseResponseSchema } from "../../commons/types";
+import { notFound } from "../../commons/modules/error-handler";
+import { baseResponseSchema, errorResponseSchema } from "../../commons/types";
 
 const scopeSchema = t.Object({
 	id: t.String(),
@@ -30,7 +31,7 @@ export const scopesModule = new Elysia({ prefix: "/v1/scopes" })
 					timestamp: Date.now(),
 					status: 200,
 				};
-			} catch (err) {
+			} catch (_err) {
 				return {
 					success: true,
 					message: "Scopes retrieved (fallback/offline mode)",
@@ -43,6 +44,8 @@ export const scopesModule = new Elysia({ prefix: "/v1/scopes" })
 		{
 			response: {
 				200: baseResponseSchema(t.Array(scopeSchema)),
+				400: errorResponseSchema,
+				500: errorResponseSchema,
 			},
 			detail: {
 				tags: ["Scopes"],
@@ -53,29 +56,35 @@ export const scopesModule = new Elysia({ prefix: "/v1/scopes" })
 	.get(
 		"/:id",
 		async ({ params: { id }, set }) => {
-			const result = await db
-				.select()
-				.from(scopes)
-				.where(eq(scopes.id, id))
-				.limit(1);
-			const scope = result[0];
-			if (!scope) {
-				set.status = 404;
+			try {
+				const result = await db
+					.select()
+					.from(scopes)
+					.where(eq(scopes.id, id))
+					.limit(1);
+				const scope = result[0];
+				if (!scope) {
+					set.status = 404;
+					return notFound("Scope");
+				}
+				set.status = 200;
+				return {
+					success: true,
+					message: "Scope retrieved successfully",
+					data: scope,
+					timestamp: Date.now(),
+					status: 200,
+				};
+			} catch (err) {
+				set.status = 500;
 				return {
 					success: false,
-					message: `Scope with id '${id}' not found`,
-					data: null,
+					message: "Failed to retrieve scope",
+					status: 500,
+					details: err instanceof Error ? err.message : undefined,
 					timestamp: Date.now(),
-					status: 404,
 				};
 			}
-			return {
-				success: true,
-				message: "Scope retrieved successfully",
-				data: scope,
-				timestamp: Date.now(),
-				status: 200,
-			};
 		},
 		{
 			params: t.Object({
@@ -83,7 +92,9 @@ export const scopesModule = new Elysia({ prefix: "/v1/scopes" })
 			}),
 			response: {
 				200: baseResponseSchema(scopeSchema),
-				404: baseResponseSchema(t.Null()),
+				404: errorResponseSchema,
+				400: errorResponseSchema,
+				500: errorResponseSchema,
 			},
 			detail: {
 				tags: ["Scopes"],

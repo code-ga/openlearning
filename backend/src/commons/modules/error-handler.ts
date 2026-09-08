@@ -1,8 +1,16 @@
-import Elysia, { type Static } from "elysia";
+import Elysia from "elysia";
 import { logger } from "../../utils/logger";
 import * as errors from "../errors";
 import { HttpError } from "../errors";
 import type { ErrorResponse } from "../types";
+
+export const notFound = (entity: string): ErrorResponse => ({
+	success: false,
+	message: `${entity} not found`,
+	status: 404,
+	details: null,
+	timestamp: Date.now(),
+});
 
 export const errorHandlerModule = new Elysia({ name: "error-handler" })
 	.error(errors)
@@ -14,8 +22,10 @@ export const errorHandlerModule = new Elysia({ name: "error-handler" })
 		});
 		let status = 500;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 		let message = (error as any).message || "Unknown Error";
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 		let details: any;
 
 		if (error instanceof HttpError) {
@@ -36,6 +46,7 @@ export const errorHandlerModule = new Elysia({ name: "error-handler" })
 			message = "Internal Server Error";
 		} else {
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 			const err = error as any;
 			if (typeof err.status === "number") {
 				status = err.status;
